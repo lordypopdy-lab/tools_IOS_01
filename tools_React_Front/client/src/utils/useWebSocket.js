@@ -1,12 +1,6 @@
 // src/utils/useWebSocket.js
 import { useEffect, useRef, useState, useCallback } from "react";
 
-/**
- * useWebSocket
- * - url: websocket url string
- * - options: { reconnectIntervalMs, maxLogs }
- * Returns { connected, lastMessage, send, logs, clearLogs }
- */
 export default function useWebSocket(url, options = {}) {
   const { reconnectIntervalMs = 2000, maxLogs = 1000 } = options;
 
