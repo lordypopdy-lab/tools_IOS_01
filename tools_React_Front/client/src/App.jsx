@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useMemo, useRef, useEffect } from "react";
 import { Container, Row, Col, Card, Navbar, Nav, Button, Badge } from "react-bootstrap";
-import { FaTerminal } from "react-icons/fa";
+import { FaWifi, FaBell, FaTerminal, FaExchangeAlt, FaKeyboard } from "react-icons/fa";
 import MatrixBackground from "./components/MatrixBackground";
 import useWebSocket from "./utils/useWebSocket";
 import "./index.css";
@@ -20,15 +20,15 @@ function normalizeLogItem(raw) {
     candidate.text && typeof candidate.text === "object" ? candidate.text : candidate;
 
   const type = candidate.type || maybePayload.type || "message";
-  const app = candidate.app || maybePayload.app || "unknown.app";
+  const app = candidate.app || maybePayload.app || candidate.app || "unknown.app";
   const text =
     (typeof candidate.text === "string" && candidate.text) ||
     (typeof maybePayload.text === "string" && maybePayload.text) ||
     (typeof maybePayload.msg === "string" && maybePayload.msg) ||
     (typeof maybePayload.message === "string" && maybePayload.message) ||
-    JSON.stringify(maybePayload).slice(0, 200);
+    JSON.stringify(maybePayload).slice(0, 200); // fallback
   const icon = candidate.icon || maybePayload.icon || null;
-  const ts = candidate.ts || maybePayload.ts || Date.now();
+  const ts = candidate.ts || maybePayload.ts || candidate.ts || Date.now();
 
   return { ts, type, app, text, icon };
 }
@@ -41,10 +41,10 @@ export default function App() {
 
   const logEndRef = useRef(null);
 
-  // normalize all incoming logs
-  const normalizedLogs = useMemo(() => logs.map((l) => normalizeLogItem(l)), [logs]);
+  const normalizedLogs = useMemo(() => {
+    return logs.map((l) => normalizeLogItem(l));
+  }, [logs]);
 
-  // derive counters from logs
   const counters = useMemo(() => {
     let notifications = 0;
     let switches = 0;
@@ -56,6 +56,7 @@ export default function App() {
 
     for (const entry of normalizedLogs) {
       const { type, app, ts } = entry;
+
       if (type === "notification") {
         notifications += 1;
       } else if (type === "switch") {
@@ -71,57 +72,16 @@ export default function App() {
         }
       }
     }
+
     return { notifications, switches, typings };
   }, [normalizedLogs]);
 
-  // auto-scroll
   useEffect(() => {
     if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [normalizedLogs.length]);
 
-  function renderAppIcon(app, iconBase64) {
-    if (iconBase64) {
-      return (
-        <img
-          src={`data:image/png;base64,${iconBase64}`}
-          alt={app}
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 6,
-            objectFit: "cover",
-            border: "1px solid #153",
-          }}
-        />
-      );
-    }
-    const parts = (app || "unknown.app").split(".");
-    const label = parts[parts.length - 1] || app;
-    const initials = label.slice(0, 2).toUpperCase();
-
-    return (
-      <div
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#001a00",
-          color: "#88ff88",
-          fontSize: 11,
-          border: "1px solid #154",
-          fontFamily: "monospace",
-        }}
-      >
-        {initials}
-      </div>
-    );
-  }
-
   return (
-    <div style={{ minHeight: "100vh", overflowX: "hidden" }}>
+    <div>
       <MatrixBackground />
 
       {/* Navbar */}
@@ -145,40 +105,34 @@ export default function App() {
       {/* Content */}
       <Container fluid className="mt-3" style={{ maxWidth: 1200 }}>
         <Row>
-          {/* Metrics */}
-          <Col md={3} xs={12}>
+          {/* Metrics Panel */}
+          <Col md={3}>
             <Card className="mb-3">
-              <Card.Body>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {renderAppIcon("notifications", null)}
-                  <div>
-                    <h6 style={{ margin: 0 }}>Notifications</h6>
-                    <div style={{ fontSize: 20 }}>{counters.notifications}</div>
-                  </div>
+              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <FaBell size={26} color="#00ff00" />
+                <div>
+                  <h6 style={{ margin: 0 }}>Notifications</h6>
+                  <div style={{ fontSize: 20 }}>{counters.notifications}</div>
                 </div>
               </Card.Body>
             </Card>
 
             <Card className="mb-3">
-              <Card.Body>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {renderAppIcon("switches", null)}
-                  <div>
-                    <h6 style={{ margin: 0 }}>App Switches</h6>
-                    <div style={{ fontSize: 20 }}>{counters.switches}</div>
-                  </div>
+              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <FaExchangeAlt size={26} color="#00ff00" />
+                <div>
+                  <h6 style={{ margin: 0 }}>App Switches</h6>
+                  <div style={{ fontSize: 20 }}>{counters.switches}</div>
                 </div>
               </Card.Body>
             </Card>
 
             <Card>
-              <Card.Body>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  {renderAppIcon("typing", null)}
-                  <div>
-                    <h6 style={{ margin: 0 }}>Typing Events</h6>
-                    <div style={{ fontSize: 20 }}>{counters.typings}</div>
-                  </div>
+              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <FaKeyboard size={26} color="#00ff00" />
+                <div>
+                  <h6 style={{ margin: 0 }}>Typing Events</h6>
+                  <div style={{ fontSize: 20 }}>{counters.typings}</div>
                 </div>
               </Card.Body>
             </Card>
@@ -195,8 +149,8 @@ export default function App() {
             </Card>
           </Col>
 
-          {/* Logs */}
-          <Col md={9} xs={12}>
+          {/* Live Logs */}
+          <Col md={9}>
             <Card>
               <Card.Header
                 style={{
@@ -209,19 +163,9 @@ export default function App() {
                 <FaTerminal /> Live Activity Feed
               </Card.Header>
 
-              <Card.Body
-                style={{
-                  maxHeight: "70vh",
-                  minHeight: 300,
-                  overflowY: "auto",
-                  background: "rgba(0,0,0,0.85)",
-                  WebkitOverflowScrolling: "touch",
-                }}
-              >
+              <Card.Body style={{ height: "60vh", overflowY: "auto", background: "rgba(0,0,0,0.85)" }}>
                 {normalizedLogs.length === 0 && (
-                  <div style={{ opacity: 0.6, color: "#00ff00", fontFamily: "monospace" }}>
-                    Waiting for data...
-                  </div>
+                  <div style={{ opacity: 0.6, color: "#00ff00", fontFamily: "monospace" }}>Waiting for data...</div>
                 )}
 
                 {normalizedLogs.map((entry, idx) => (
@@ -237,7 +181,6 @@ export default function App() {
                       fontSize: 13,
                     }}
                   >
-                    {renderAppIcon(entry.app, entry.icon)}
                     <span style={{ color: "#66ff66", fontWeight: 700 }}>{formatTime(entry.ts)}</span>
                     <span style={{ color: "#99ff99" }}>
                       [{entry.app || "unknown"}] {entry.text}
