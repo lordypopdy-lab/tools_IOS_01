@@ -1,40 +1,41 @@
 body {
-    margin: 0;
-    background: black;
-    color: #00ff00;
-    font-family: 'Courier New', monospace;
-    overflow: hidden;
-  }
-  
-  .matrix {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: black;
-    z-index: -1;
-    overflow: hidden;
-  }
-  
-  canvas {
-    display: block;
-  }
-  
-  .card {
-    background-color: rgba(0, 0, 0, 0.8) !important;
-    border: 1px solid #00ff00 !important;
-    color: #00ff00 !important;
-  }
-  
-  .navbar {
-    background-color: #000 !important;
-    border-bottom: 1px solid #00ff00;
-  }
-  
-  .navbar-brand {
-    color: #00ff00 !important;
-    font-weight: bold;
-    letter-spacing: 2px;
-  }
-  
+  margin: 0;
+  background: black;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  /* ✅ allow vertical scroll, prevent unwanted horizontal scroll */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.matrix {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: black;
+  z-index: -1;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+}
+
+.card {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  border: 1px solid #00ff00 !important;
+  color: #00ff00 !important;
+}
+
+.navbar {
+  background-color: #000 !important;
+  border-bottom: 1px solid #00ff00;
+}
+
+.navbar-brand {
+  color: #00ff00 !important;
+  font-weight: bold;
+  letter-spacing: 2px;
+}

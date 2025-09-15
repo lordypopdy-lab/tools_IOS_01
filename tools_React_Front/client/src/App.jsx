@@ -69,7 +69,7 @@ export default function App() {
   }, [lastMessage]);
 
   return (
-    <div style={{ minHeight: "100vh", overflowX: "hidden", marginBottom: "40px" }}>
+    <div style={{ minHeight: "100vh", overflowX: "hidden", }}>
       <MatrixBackground />
 
       <Navbar expand="lg" variant="dark">
