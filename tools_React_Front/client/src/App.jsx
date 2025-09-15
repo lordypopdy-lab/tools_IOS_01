@@ -1,7 +1,7 @@
 // src/App.jsx
 import React, { useMemo, useRef, useEffect } from "react";
 import { Container, Row, Col, Card, Navbar, Nav, Button, Badge } from "react-bootstrap";
-import { FaWifi, FaBell, FaTerminal, FaExchangeAlt } from "react-icons/fa";
+import { FaTerminal } from "react-icons/fa";
 import MatrixBackground from "./components/MatrixBackground";
 import useWebSocket from "./utils/useWebSocket";
 import "./index.css";
@@ -12,6 +12,7 @@ function formatTime(ts) {
   const d = new Date(ts);
   return d.toLocaleTimeString();
 }
+
 function normalizeLogItem(raw) {
   const candidate = raw && typeof raw === "object" ? raw : { text: String(raw) };
 
@@ -19,33 +20,31 @@ function normalizeLogItem(raw) {
     candidate.text && typeof candidate.text === "object" ? candidate.text : candidate;
 
   const type = candidate.type || maybePayload.type || "message";
-  const app = candidate.app || maybePayload.app || candidate.app || "unknown.app";
+  const app = candidate.app || maybePayload.app || "unknown.app";
   const text =
     (typeof candidate.text === "string" && candidate.text) ||
     (typeof maybePayload.text === "string" && maybePayload.text) ||
     (typeof maybePayload.msg === "string" && maybePayload.msg) ||
     (typeof maybePayload.message === "string" && maybePayload.message) ||
-    JSON.stringify(maybePayload).slice(0, 200); // fallback
+    JSON.stringify(maybePayload).slice(0, 200);
   const icon = candidate.icon || maybePayload.icon || null;
-  const ts = candidate.ts || maybePayload.ts || candidate.ts || Date.now();
+  const ts = candidate.ts || maybePayload.ts || Date.now();
 
   return { ts, type, app, text, icon };
 }
 
 export default function App() {
-  const { connected, lastMessage, logs, send, clearLogs } = useWebSocket(WS_URL, {
+  const { connected, logs, send, clearLogs } = useWebSocket(WS_URL, {
     reconnectIntervalMs: 2000,
     maxLogs: 1200,
   });
 
   const logEndRef = useRef(null);
 
-  // normalize all incoming logs into predictable objects
-  const normalizedLogs = useMemo(() => {
-    return logs.map((l) => normalizeLogItem(l));
-  }, [logs]);
+  // normalize all incoming logs
+  const normalizedLogs = useMemo(() => logs.map((l) => normalizeLogItem(l)), [logs]);
 
-
+  // derive counters from logs
   const counters = useMemo(() => {
     let notifications = 0;
     let switches = 0;
@@ -55,14 +54,11 @@ export default function App() {
     const lastTypingTsByApp = new Map();
     let lastSwitchApp = null;
 
-    // iterate oldest → newest
     for (const entry of normalizedLogs) {
       const { type, app, ts } = entry;
-
       if (type === "notification") {
         notifications += 1;
       } else if (type === "switch") {
-        // only count if different from last counted switch app
         if (app !== lastSwitchApp) {
           switches += 1;
           lastSwitchApp = app;
@@ -74,30 +70,31 @@ export default function App() {
           lastTypingTsByApp.set(app, ts);
         }
       }
-      // other types ignored for counters
     }
-
     return { notifications, switches, typings };
   }, [normalizedLogs]);
 
-  // auto-scroll the feed when new logs arrive
+  // auto-scroll
   useEffect(() => {
     if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
   }, [normalizedLogs.length]);
 
-  // Helper: render app label from package (last token) and an initials fallback
   function renderAppIcon(app, iconBase64) {
     if (iconBase64) {
-      // display base64 image
       return (
         <img
           src={`data:image/png;base64,${iconBase64}`}
           alt={app}
-          style={{ width: 26, height: 26, borderRadius: 6, objectFit: "cover", border: "1px solid #153" }}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 6,
+            objectFit: "cover",
+            border: "1px solid #153",
+          }}
         />
       );
     }
-    // fallback: small rounded badge with last part of package
     const parts = (app || "unknown.app").split(".");
     const label = parts[parts.length - 1] || app;
     const initials = label.slice(0, 2).toUpperCase();
@@ -124,7 +121,7 @@ export default function App() {
   }
 
   return (
-    <div>
+    <div style={{ minHeight: "100vh", overflowX: "hidden" }}>
       <MatrixBackground />
 
       {/* Navbar */}
@@ -148,8 +145,8 @@ export default function App() {
       {/* Content */}
       <Container fluid className="mt-3" style={{ maxWidth: 1200 }}>
         <Row>
-          {/* Metrics Panel */}
-          <Col md={3}>
+          {/* Metrics */}
+          <Col md={3} xs={12}>
             <Card className="mb-3">
               <Card.Body>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -198,8 +195,8 @@ export default function App() {
             </Card>
           </Col>
 
-          {/* Live Logs */}
-          <Col md={9}>
+          {/* Logs */}
+          <Col md={9} xs={12}>
             <Card>
               <Card.Header
                 style={{
@@ -212,9 +209,19 @@ export default function App() {
                 <FaTerminal /> Live Activity Feed
               </Card.Header>
 
-              <Card.Body style={{ height: "60vh", overflowY: "auto", background: "rgba(0,0,0,0.85)" }}>
+              <Card.Body
+                style={{
+                  maxHeight: "70vh",
+                  minHeight: 300,
+                  overflowY: "auto",
+                  background: "rgba(0,0,0,0.85)",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
                 {normalizedLogs.length === 0 && (
-                  <div style={{ opacity: 0.6, color: "#00ff00", fontFamily: "monospace" }}>Waiting for data...</div>
+                  <div style={{ opacity: 0.6, color: "#00ff00", fontFamily: "monospace" }}>
+                    Waiting for data...
+                  </div>
                 )}
 
                 {normalizedLogs.map((entry, idx) => (
@@ -230,11 +237,8 @@ export default function App() {
                       fontSize: 13,
                     }}
                   >
-                    {/* icon or fallback */}
                     {renderAppIcon(entry.app, entry.icon)}
-
                     <span style={{ color: "#66ff66", fontWeight: 700 }}>{formatTime(entry.ts)}</span>
-
                     <span style={{ color: "#99ff99" }}>
                       [{entry.app || "unknown"}] {entry.text}
                     </span>
