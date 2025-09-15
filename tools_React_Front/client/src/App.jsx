@@ -1,156 +1,162 @@
 // src/App.jsx
-import React, { useMemo, useRef, useEffect } from "react";
-import { Container, Row, Col, Card, Navbar, Nav, Button, Badge } from "react-bootstrap";
-import { FaWifi, FaBell, FaTerminal, FaExchangeAlt, FaKeyboard } from "react-icons/fa";
+import React, { useMemo, useRef, useEffect, useState } from "react";
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Navbar,
+  Nav,
+  Button,
+  Badge,
+} from "react-bootstrap";
+import { FaServer, FaWifi, FaBell, FaTerminal } from "react-icons/fa";
 import MatrixBackground from "./components/MatrixBackground";
 import useWebSocket from "./utils/useWebSocket";
 import "./index.css";
 
-const WS_URL = import.meta.env.VITE_WS_URL || "wss://tools-ios-01.onrender.com/ws"; // or your ws url
+const WS_URL =
+  import.meta.env.VITE_WS_URL || "wss://tools-ios-01.onrender.com/ws"; // set via .env
 
 function formatTime(ts) {
   const d = new Date(ts);
   return d.toLocaleTimeString();
 }
 
-function normalizeLogItem(raw) {
-  const candidate = raw && typeof raw === "object" ? raw : { text: String(raw) };
-
-  const maybePayload =
-    candidate.text && typeof candidate.text === "object" ? candidate.text : candidate;
-
-  const type = candidate.type || maybePayload.type || "message";
-  const app = candidate.app || maybePayload.app || candidate.app || "unknown.app";
-  const text =
-    (typeof candidate.text === "string" && candidate.text) ||
-    (typeof maybePayload.text === "string" && maybePayload.text) ||
-    (typeof maybePayload.msg === "string" && maybePayload.msg) ||
-    (typeof maybePayload.message === "string" && maybePayload.message) ||
-    JSON.stringify(maybePayload).slice(0, 200); // fallback
-  const icon = candidate.icon || maybePayload.icon || null;
-  const ts = candidate.ts || maybePayload.ts || candidate.ts || Date.now();
-
-  return { ts, type, app, text, icon };
-}
-
 export default function App() {
-  const { connected, logs, send, clearLogs } = useWebSocket(WS_URL, {
-    reconnectIntervalMs: 2000,
-    maxLogs: 1200,
-  });
+  const { connected, lastMessage, logs, send, clearLogs } = useWebSocket(
+    WS_URL,
+    { reconnectIntervalMs: 2000, maxLogs: 800 }
+  );
 
+  const [counters, setCounters] = useState({
+    notifications: 0,
+    switches: 0,
+    typings: 0,
+  });
   const logEndRef = useRef(null);
 
-  const normalizedLogs = useMemo(() => {
-    return logs.map((l) => normalizeLogItem(l));
-  }, [logs]);
-
-  const counters = useMemo(() => {
-    let notifications = 0;
-    let switches = 0;
-    let typings = 0;
-
-    const typingDebounceMs = 3000;
-    const lastTypingTsByApp = new Map();
-    let lastSwitchApp = null;
-
-    for (const entry of normalizedLogs) {
-      const { type, app, ts } = entry;
-
-      if (type === "notification") {
-        notifications += 1;
-      } else if (type === "switch") {
-        if (app !== lastSwitchApp) {
-          switches += 1;
-          lastSwitchApp = app;
-        }
-      } else if (type === "typing") {
-        const prev = lastTypingTsByApp.get(app) || 0;
-        if (ts - prev > typingDebounceMs) {
-          typings += 1;
-          lastTypingTsByApp.set(app, ts);
-        }
-      }
-    }
-
-    return { notifications, switches, typings };
-  }, [normalizedLogs]);
+  const prettyLogs = useMemo(
+    () =>
+      logs.map((l) => {
+        const text =
+          typeof l.text === "string"
+            ? l.text
+            : typeof l.text === "object"
+            ? JSON.stringify(l.text)
+            : String(l.text);
+        return { ...l, text };
+      }),
+    [logs]
+  );
 
   useEffect(() => {
-    if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [normalizedLogs.length]);
+    if (logEndRef.current)
+      logEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [prettyLogs.length]);
+
+  useEffect(() => {
+    if (!lastMessage) return;
+    if (typeof lastMessage === "object") {
+      if (lastMessage.type === "notification") {
+        setCounters((s) => ({ ...s, notifications: s.notifications + 1 }));
+      } else if (lastMessage.type === "switch") {
+        setCounters((s) => ({ ...s, switches: s.switches + 1 }));
+      } else if (lastMessage.type === "typing") {
+        setCounters((s) => ({ ...s, typings: s.typings + 1 }));
+      }
+    }
+  }, [lastMessage]);
 
   return (
-    <div>
+    <div style={{ minHeight: "100vh", overflowX: "hidden", marginBottom: "40px" }}>
       <MatrixBackground />
 
-      {/* Navbar */}
       <Navbar expand="lg" variant="dark">
-        <Container>
+        <Container fluid>
           <Navbar.Brand style={{ color: "#00ff00", fontFamily: "monospace" }}>
             🟢 HACKMODE — PhoneActivity
           </Navbar.Brand>
-          <Nav>
-            <Nav.Link style={{ color: "#00ff00" }}>Live</Nav.Link>
-            <Nav.Link style={{ color: "#00ff00" }}>Metrics</Nav.Link>
-          </Nav>
-          <div style={{ marginLeft: 12 }}>
-            <Badge bg={connected ? "success" : "secondary"} style={{ fontFamily: "monospace" }}>
-              {connected ? "WS CONNECTED" : "WS DISCONNECTED"}
-            </Badge>
-          </div>
+          <Navbar.Toggle aria-controls="basic-navbar-nav" />
+          <Navbar.Collapse id="basic-navbar-nav">
+            <Nav className="me-auto">
+              <Nav.Link style={{ color: "#00ff00" }}>Live</Nav.Link>
+              <Nav.Link style={{ color: "#00ff00" }}>Metrics</Nav.Link>
+            </Nav>
+            <div style={{ marginTop: 10 }}>
+              <Badge
+                bg={connected ? "success" : "secondary"}
+                style={{ fontFamily: "monospace" }}
+              >
+                {connected ? "WS CONNECTED" : "WS DISCONNECTED"}
+              </Badge>
+            </div>
+          </Navbar.Collapse>
         </Container>
       </Navbar>
 
-      {/* Content */}
-      <Container fluid className="mt-3" style={{ maxWidth: 1200 }}>
+      <Container fluid className="mt-3" style={{ paddingBottom: "80px" }}>
         <Row>
           {/* Metrics Panel */}
-          <Col md={3}>
+          <Col xs={12} md={3} className="mb-3">
             <Card className="mb-3">
-              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <FaBell size={26} color="#00ff00" />
-                <div>
-                  <h6 style={{ margin: 0 }}>Notifications</h6>
-                  <div style={{ fontSize: 20 }}>{counters.notifications}</div>
+              <Card.Body>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <FaServer size={30} />
+                  <div>
+                    <h6 style={{ margin: 0 }}>Notifications</h6>
+                    <div style={{ fontSize: 18 }}>{counters.notifications}</div>
+                  </div>
                 </div>
               </Card.Body>
             </Card>
 
             <Card className="mb-3">
-              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <FaExchangeAlt size={26} color="#00ff00" />
-                <div>
-                  <h6 style={{ margin: 0 }}>App Switches</h6>
-                  <div style={{ fontSize: 20 }}>{counters.switches}</div>
+              <Card.Body>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <FaBell size={30} />
+                  <div>
+                    <h6 style={{ margin: 0 }}>App Switches</h6>
+                    <div style={{ fontSize: 18 }}>{counters.switches}</div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+
+            <Card className="mb-3">
+              <Card.Body>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <FaWifi size={30} />
+                  <div>
+                    <h6 style={{ margin: 0 }}>Typing Events</h6>
+                    <div style={{ fontSize: 18 }}>{counters.typings}</div>
+                  </div>
                 </div>
               </Card.Body>
             </Card>
 
             <Card>
-              <Card.Body style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <FaKeyboard size={26} color="#00ff00" />
-                <div>
-                  <h6 style={{ margin: 0 }}>Typing Events</h6>
-                  <div style={{ fontSize: 20 }}>{counters.typings}</div>
-                </div>
-              </Card.Body>
-            </Card>
-
-            <Card className="mt-3">
               <Card.Body>
-                <Button variant="outline-success" onClick={() => send({ type: "ping" })}>
+                <Button
+                  variant="outline-success"
+                  className="mb-2 w-100"
+                  onClick={() => send({ type: "ping" })}
+                >
                   Ping Server
-                </Button>{" "}
-                <Button variant="outline-danger" onClick={() => clearLogs()}>
+                </Button>
+                <Button
+                  variant="outline-danger"
+                  className="w-100"
+                  onClick={() => clearLogs()}
+                >
                   Clear Logs
                 </Button>
               </Card.Body>
             </Card>
           </Col>
 
-          {/* Live Logs */}
-          <Col md={9}>
+          {/* Terminal Feed */}
+          <Col xs={12} md={9}>
             <Card>
               <Card.Header
                 style={{
@@ -162,33 +168,36 @@ export default function App() {
               >
                 <FaTerminal /> Live Activity Feed
               </Card.Header>
-
-              <Card.Body style={{ height: "60vh", overflowY: "auto", background: "rgba(0,0,0,0.85)" }}>
-                {normalizedLogs.length === 0 && (
-                  <div style={{ opacity: 0.6, color: "#00ff00", fontFamily: "monospace" }}>Waiting for data...</div>
-                )}
-
-                {normalizedLogs.map((entry, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      marginBottom: 8,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      color: "#00ff00",
-                      fontFamily: "Courier New, monospace",
-                      fontSize: 13,
-                    }}
-                  >
-                    <span style={{ color: "#66ff66", fontWeight: 700 }}>{formatTime(entry.ts)}</span>
-                    <span style={{ color: "#99ff99" }}>
-                      [{entry.app || "unknown"}] {entry.text}
-                    </span>
-                  </div>
-                ))}
-
-                <div ref={logEndRef} />
+              <Card.Body
+                style={{
+                  height: "60vh",
+                  overflowY: "auto",
+                  overflowX: "hidden",
+                  background: "rgba(0,0,0,0.7)",
+                }}
+              >
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    margin: 0,
+                    fontFamily: "Courier New, monospace",
+                    color: "#00ff00",
+                    fontSize: 13,
+                  }}
+                >
+                  {prettyLogs.length === 0 && (
+                    <div style={{ opacity: 0.6 }}>Waiting for data...</div>
+                  )}
+                  {prettyLogs.map((l, idx) => (
+                    <div key={idx} style={{ marginBottom: 6 }}>
+                      <span style={{ color: "#66ff66", fontWeight: 700 }}>
+                        {formatTime(l.ts)}
+                      </span>{" "}
+                      <span style={{ color: "#99ff99" }}>{l.text}</span>
+                    </div>
+                  ))}
+                </pre>
+                <div ref={logEndRef}></div>
               </Card.Body>
             </Card>
           </Col>
